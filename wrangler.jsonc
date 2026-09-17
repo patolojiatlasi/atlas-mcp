@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "atlas-mcp",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-15",
+  // Keep request logs out of storage: PRIVACY.md promises diagnostic lines are only seen live (wrangler tail).
+  "observability": { "enabled": false }
+}

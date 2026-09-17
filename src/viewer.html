@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; font: 14px/1.4 system-ui, sans-serif; color-scheme: light dark; }
+  body { display: flex; flex-direction: column; height: 500px; box-sizing: border-box; }
+  body.fullscreen { height: 100vh; }
+  header { display: flex; gap: 8px; align-items: center; padding: 6px 10px; }
+  #title { flex: 1; min-width: 0; margin: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #stain { opacity: .7; white-space: nowrap; }
+  main { flex: 1; min-height: 0; position: relative; background: #111; }
+  #osd { position: absolute; inset: 0; }
+  #fail { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; color: #eee; text-align: center; padding: 16px; }
+  footer { padding: 4px 10px; font-size: 11px; opacity: .65; }
+  [hidden] { display: none !important; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/openseadragon@6.1.1/build/openseadragon/openseadragon.min.js"
+  integrity="sha384-KKly+4vqqBHitr2XfNKWa3+0asIVpzYs2HijkM/zz0X6rgnyLuQEVERX9HqkM5/P" crossorigin="anonymous"></script>
+<script type="importmap">
+{ "integrity": { "https://cdn.jsdelivr.net/npm/@modelcontextprotocol/ext-apps@2.0.0/dist/src/app-with-deps.js": "sha384-6ARQ6ltFzjAPfyWHwt3W/0sqMo0A8hIV2HwC+IEGFPojOlTLKfJBXuipD/90NCRI" } }
+</script>
+</head>
+<body>
+<header>
+  <h1 id="title">Loading slide…</h1>
+  <span id="stain"></span>
+  <button id="fullscreen" hidden>Fullscreen</button>
+  <button id="open" hidden>Open in atlas</button>
+</header>
+<main>
+  <div id="osd"></div>
+  <div id="fail" hidden><span id="fail-text">The viewer can't load here.</span><button id="fail-open">Open in atlas</button></div>
+</main>
+<footer id="disclaimer">Educational images, not for diagnosing individual patients.</footer>
+<script type="module">
+import { App } from "https://cdn.jsdelivr.net/npm/@modelcontextprotocol/ext-apps@2.0.0/dist/src/app-with-deps.js";
+
+const $ = (id) => document.getElementById(id);
+const TEXT = {
+  en: { fullscreen: "Fullscreen", exit: "Exit fullscreen", open: "Open in atlas", fail: "The viewer can't load here.", missing: "Slide not found", disclaimer: "Educational images, not for diagnosing individual patients." },
+  tr: { fullscreen: "Tam ekran", exit: "Tam ekrandan çık", open: "Atlasta aç", fail: "Görüntüleyici burada açılamıyor.", missing: "Kesit bulunamadı", disclaimer: "Eğitim amaçlı görüntülerdir, hasta tanısı için kullanılmaz." },
+};
+// Declaring the modes is required: hosts must refuse modes the app did not list. No 3rd arg, or autoResize turns off.
+const app = new App({ name: "atlas-slide-viewer", version: "1.0.0" }, { availableDisplayModes: ["inline", "fullscreen"] });
+let viewer, atlasUrl, t = TEXT.en;
+
+function applyContext(ctx = app.getHostContext() ?? {}) {
+  t = ctx.locale?.toLowerCase().startsWith("tr") ? TEXT.tr : TEXT.en;
+  const fullscreen = ctx.displayMode === "fullscreen";
+  document.body.classList.toggle("fullscreen", fullscreen);
+  const inset = fullscreen ? ctx.safeAreaInsets : null;
+  document.body.style.padding = inset ? `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px` : "";
+  if (!fullscreen) document.body.style.height = `${Math.min(500, ctx.containerDimensions?.maxHeight ?? 500)}px`;
+  else document.body.style.height = "";
+  $("fullscreen").hidden = !ctx.availableDisplayModes?.includes("fullscreen");
+  $("fullscreen").textContent = fullscreen ? t.exit : t.fullscreen;
+  $("open").textContent = $("fail-open").textContent = t.open;
+  $("fail-text").textContent = t.fail;
+  $("disclaimer").textContent = t.disclaimer;
+  // Inline, plain wheel/one finger scrolls the chat; ctrl/cmd+wheel or two fingers zoom.
+  viewer?.setCooperativeGestures(!fullscreen);
+}
+
+function showFailure() {
+  $("fail").hidden = false;
+  $("fail-open").hidden = !atlasUrl;
+}
+
+// Register before connect(): the host may send the tool result right after the handshake.
+app.addEventListener("toolresult", ({ structuredContent: s, isError }) => {
+  applyContext();
+  if (isError || !s?.tileSource) {
+    $("title").textContent = t.missing;
+    return;
+  }
+  const tr = t === TEXT.tr;
+  $("title").textContent = (tr ? s.title_tr || s.title_en : s.title_en || s.title_tr) ?? s.id;
+  $("stain").textContent = s.stain ?? "";
+  atlasUrl = (tr ? s.atlas_url_tr || s.atlas_url_en : s.atlas_url_en || s.atlas_url_tr) || s.viewer_url;
+  $("open").hidden = !atlasUrl;
+  $("fail").hidden = true;
+  viewer?.destroy();
+  viewer = OpenSeadragon({
+    element: $("osd"),
+    prefixUrl: "https://cdn.jsdelivr.net/npm/openseadragon@6.1.1/build/openseadragon/images/",
+    tileSources: s.tileSource,
+    crossOriginPolicy: "Anonymous",
+    drawer: "canvas",
+    showNavigator: true,
+    showFullPageControl: false,
+    cooperativeGestures: app.getHostContext()?.displayMode !== "fullscreen",
+  });
+  let loaded = 0, failed = 0;
+  viewer.addHandler("open-failed", showFailure);
+  viewer.addHandler("tile-loaded", () => loaded++);
+  viewer.addHandler("tile-load-failed", () => { if (++failed >= 8 && loaded === 0) showFailure(); });
+});
+
+app.addEventListener("hostcontextchanged", () => applyContext());
+
+$("fullscreen").onclick = async () => {
+  const next = app.getHostContext()?.displayMode === "fullscreen" ? "inline" : "fullscreen";
+  const { mode } = await app.requestDisplayMode({ mode: next });
+  applyContext({ ...app.getHostContext(), displayMode: mode });
+};
+$("open").onclick = $("fail-open").onclick = () => app.openLink({ url: atlasUrl });
+
+await app.connect();
+applyContext();
+</script>
+</body>
+</html>
