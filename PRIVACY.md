@@ -26,14 +26,15 @@ The server matches that input against a fixed, public list of atlas slides and r
 ### What is stored
 - **Search text and slide identifiers:** not stored. They are processed in memory to answer the request and then discarded.
 - **Diagnostic logs:** for troubleshooting, the server writes one line per request with the request type, the tool or resource name (for example `tools/call show_slide`), and the client application's name and protocol version (for example `claude-ai`). It never logs the search text or any other tool input. These lines appear only while the maintainer is watching a live log stream and are not kept.
+- **Retention:** nothing about individual users is retained by this server. There is no database.
 - **Hosting provider logs:** the server runs on Cloudflare Workers. Cloudflare may process technical data such as IP addresses and request metadata to operate and secure its network, under the [Cloudflare Privacy Policy](https://www.cloudflare.com/privacypolicy/).
 
 ### The slide viewer
 The viewer runs inside your AI assistant and loads content directly from your device:
-- viewer code (OpenSeadragon and the MCP Apps library) from [jsDelivr](https://www.jsdelivr.com/terms/privacy-policy-jsdelivr-net);
+- viewer code (OpenSeadragon and the MCP Apps library) from this server, `atlas-mcp.serdarbalci.workers.dev`, on Cloudflare;
 - slide image tiles from `images.patolojiatlasi.com`, which is hosted on [GitHub Pages](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
 
-These providers receive standard web request data, such as IP address and browser type, under their own policies. The viewer sets no cookies and stores nothing on your device.
+These hosts receive standard web request data, such as IP address and browser type, under the Cloudflare and GitHub policies linked above. The viewer sets no cookies and stores nothing on your device.
 
 The "Open in atlas" button opens `patolojiatlasi.com` or `histopathologyatlas.com`, which have their own privacy practices.
 
@@ -73,14 +74,15 @@ Sunucu bu girdiyi atlasın sabit ve herkese açık kesit listesinde arar ve sonu
 ### Ne saklanır
 - **Arama metni ve kesit kimlikleri:** saklanmaz. İsteği yanıtlamak için bellekte işlenir, ardından silinir.
 - **Tanılama kayıtları:** sorun gidermek için sunucu her istek için bir satır yazar; bu satırda yalnızca istek türü, araç ya da kaynak adı (örneğin `tools/call show_slide`) ve istemci uygulamanın adı ile protokol sürümü (örneğin `claude-ai`) bulunur. Arama metni ve diğer araç girdileri asla kaydedilmez. Bu satırlar yalnızca bakımı yapan kişi canlı kayıt akışını izlerken görünür ve saklanmaz.
+- **Saklama süresi:** sunucu, kullanıcılarla ilgili hiçbir bilgiyi saklamaz; veritabanı yoktur.
 - **Barındırma sağlayıcısı kayıtları:** sunucu Cloudflare Workers üzerinde çalışır. Cloudflare, ağını işletmek ve korumak için IP adresi ve istek bilgileri gibi teknik verileri [Cloudflare Gizlilik Politikası](https://www.cloudflare.com/privacypolicy/) kapsamında işleyebilir.
 
 ### Kesit görüntüleyici
 Görüntüleyici yapay zekâ asistanınızın içinde çalışır ve içeriği doğrudan cihazınızdan yükler:
-- görüntüleyici kodu (OpenSeadragon ve MCP Apps kütüphanesi) [jsDelivr](https://www.jsdelivr.com/terms/privacy-policy-jsdelivr-net) üzerinden;
+- görüntüleyici kodu (OpenSeadragon ve MCP Apps kütüphanesi) Cloudflare üzerindeki bu sunucudan, `atlas-mcp.serdarbalci.workers.dev` adresinden;
 - kesit görüntü parçaları, [GitHub Pages](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) üzerinde barındırılan `images.patolojiatlasi.com` adresinden.
 
-Bu sağlayıcılar IP adresi ve tarayıcı türü gibi standart web isteği bilgilerini kendi politikaları kapsamında alır. Görüntüleyici çerez kullanmaz ve cihazınıza bir şey kaydetmez.
+Bu sunucular IP adresi ve tarayıcı türü gibi standart web isteği bilgilerini yukarıda bağlantısı verilen Cloudflare ve GitHub politikaları kapsamında alır. Görüntüleyici çerez kullanmaz ve cihazınıza bir şey kaydetmez.
 
 "Atlasta aç" düğmesi `patolojiatlasi.com` veya `histopathologyatlas.com` adresini açar; bu sitelerin kendi gizlilik uygulamaları vardır.
 

@@ -39,7 +39,7 @@ Do not:
 To the fullest extent permitted by law, the maintainers and contributors are not liable for any damages arising from use of, or inability to use, the service or its content.
 
 ### 7. Third-party services
-- The service runs inside AI assistants (such as ChatGPT or Claude) and on Cloudflare, jsDelivr and GitHub Pages.
+- The service runs inside AI assistants (such as ChatGPT or Claude) and on Cloudflare and GitHub Pages.
 - Your use of those products is governed by their own terms.
 
 ### 8. Changes
@@ -83,7 +83,7 @@ Hasta adı, protokol numarası, doğum tarihi veya bir kişiyi tanımlayabilecek
 Yasaların izin verdiği en geniş ölçüde, bakımı yapanlar ve katkıda bulunanlar; hizmetin veya içeriğinin kullanılmasından ya da kullanılamamasından doğan hiçbir zarardan sorumlu değildir.
 
 ### 7. Üçüncü taraf hizmetler
-- Hizmet, yapay zekâ asistanlarının (ChatGPT, Claude gibi) içinde ve Cloudflare, jsDelivr ve GitHub Pages üzerinde çalışır.
+- Hizmet, yapay zekâ asistanlarının (ChatGPT, Claude gibi) içinde ve Cloudflare ile GitHub Pages üzerinde çalışır.
 - Bu ürünlerin kullanımı kendi koşullarına tabidir.
 
 ### 8. Değişiklikler

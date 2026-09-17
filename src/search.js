@@ -40,7 +40,7 @@ const caseSummary = (slide, slides) => ({
   case: slide.case,
   title_en: slide.title_en,
   title_tr: slide.title_tr,
-  ...(slide.quiz && { quiz: true, note: "Quiz case: diagnosis hidden. Do not guess or reveal it unless the user asks." }),
+  ...(slide.quiz && { quiz: true, note: "Self-assessment quiz case: the diagnosis is intentionally not included." }),
   atlas_url_en: slide.atlas_url_en,
   atlas_url_tr: slide.atlas_url_tr,
   slides: slides.map((s) => ({ id: s.id, stain: s.stain })),

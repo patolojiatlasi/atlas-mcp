@@ -63,7 +63,7 @@ Both tools are read-only. The viewer is built on the open [MCP Apps](https://git
 
 ```text
 ChatGPT / Claude ──MCP──► Cloudflare Worker /mcp ── data/catalog.json (bundled)
-viewer iframe ── OpenSeadragon (cdn.jsdelivr.net) ── tiles (images.patolojiatlasi.com)
+viewer iframe ── OpenSeadragon + MCP Apps bridge (same Worker, /vendor) ── tiles (images.patolojiatlasi.com)
 ```
 
 | File | Role |
@@ -71,14 +71,16 @@ viewer iframe ── OpenSeadragon (cdn.jsdelivr.net) ── tiles (images.patol
 | `scripts/build-catalog.mjs` | Builds `data/catalog.json` from the atlas repo: `lists/list.yaml` plus the rendered book (`docs/*.html` TR, `EN/*.html` EN). It checks every slide's DZI and one tile, and keeps a slide only if it is in the book (or published) and its tiles exist. |
 | `src/search.js` | Keyword search: Turkish-aware folding (ı/ş/ğ…, H&E, Ki-67), stopwords, top-tier ranking. |
 | `src/worker.js` | MCP server: 2 tools and the viewer resource with its Content Security Policy. |
-| `src/viewer.html` | Viewer widget: MCP Apps `App` bridge plus OpenSeadragon, with pinned CDN versions and SRI hashes. |
+| `src/viewer.html` | Viewer widget: MCP Apps `App` bridge plus OpenSeadragon. `%ORIGIN%` is replaced by the Worker's public origin. |
+| `public/vendor/`, `scripts/vendor.mjs` | Self-hosted viewer scripts (pinned versions, SRI-checked), served as Worker static assets so the viewer loads nothing from third-party domains. |
+| `SUBMISSION.md`, `assets/icon-512.png` | Copy-ready ChatGPT and Claude directory listing values, test cases and icon. |
 | `test/search.test.mjs` | Search and catalog checks (`node --test`). |
 
 ```bash
 npm install
 npm run catalog        # rebuild data/catalog.json (ATLAS_DIR defaults to ../patolojiatlasi.github.io)
 npm test
-npm run dev            # http://localhost:8787/mcp; inspect with: npx @modelcontextprotocol/inspector
+npm run dev            # http://localhost:8787/mcp (viewer scripts from localhost); inspect with: npx @modelcontextprotocol/inspector
 npx wrangler login     # once
 npm run deploy
 npx wrangler tail      # live request log: request type and tool name only
@@ -90,9 +92,11 @@ npx wrangler tail      # live request log: request type and tool name only
 
 **Gotchas**
 - **Host caching:** ChatGPT and Claude cache tool and resource metadata. After changing `viewer.html`, bump `viewer-vN` in `src/worker.js` and refresh the connector.
-- **CSP:** every external domain the viewer loads must be listed in `resourceDomains` (`src/worker.js`), or hosts block it.
-- **SRI hashes:** when upgrading OpenSeadragon or ext-apps, recompute the hashes with `curl -s URL | openssl dgst -sha384 -binary | openssl base64 -A`.
+- **CSP:** every domain the viewer loads from must be listed in `resourceDomains` and `openai/widgetCSP` (`src/worker.js`), or hosts block it. Directory reviewers check that the list matches what the viewer actually loads.
+- **Upgrading OpenSeadragon or ext-apps:** `npm install` the new version, run `npm run vendor`, paste the printed SRI hashes and file names into `viewer.html`, and bump `viewer-vN`. `npm test` fails if a hash doesn't match.
+- **`ui.domain`:** don't set it. Claude only accepts its own hash value there. ChatGPT reads `openai/widgetDomain` instead.
+- **OpenAI domain verification:** `npx wrangler secret put OPENAI_APPS_CHALLENGE` serves the token at `/.well-known/openai-apps-challenge`.
 - **Tile host:** `images.patolojiatlasi.com` (GitHub Pages) rejects CORS preflights, so the viewer must keep making plain GETs.
 - **Quiz cases:** diagnoses sit in the search-only `terms` field. `show_slide` and search results never return that field.
 
-Build notes and lessons learned: [TODO.md](TODO.md), [CHANGELOG.md](CHANGELOG.md).
+Directory listing: [SUBMISSION.md](SUBMISSION.md). Build notes and lessons learned: [TODO.md](TODO.md), [CHANGELOG.md](CHANGELOG.md).

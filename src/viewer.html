@@ -16,16 +16,20 @@
   footer { padding: 4px 10px; font-size: 11px; opacity: .65; }
   [hidden] { display: none !important; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/openseadragon@6.1.1/build/openseadragon/openseadragon.min.js"
+<!-- %ORIGIN% is replaced by the Worker with its public origin; scripts are served from public/vendor (scripts/vendor.mjs). -->
+<script src="%ORIGIN%/vendor/openseadragon-6.1.1.min.js"
   integrity="sha384-KKly+4vqqBHitr2XfNKWa3+0asIVpzYs2HijkM/zz0X6rgnyLuQEVERX9HqkM5/P" crossorigin="anonymous"></script>
 <script type="importmap">
-{ "integrity": { "https://cdn.jsdelivr.net/npm/@modelcontextprotocol/ext-apps@2.0.0/dist/src/app-with-deps.js": "sha384-6ARQ6ltFzjAPfyWHwt3W/0sqMo0A8hIV2HwC+IEGFPojOlTLKfJBXuipD/90NCRI" } }
+{ "integrity": { "%ORIGIN%/vendor/ext-apps-2.0.0-app-with-deps.js": "sha384-6ARQ6ltFzjAPfyWHwt3W/0sqMo0A8hIV2HwC+IEGFPojOlTLKfJBXuipD/90NCRI" } }
 </script>
 </head>
 <body>
 <header>
   <h1 id="title">Loading slide…</h1>
   <span id="stain"></span>
+  <button id="zoom-out" aria-label="Zoom out">−</button>
+  <button id="zoom-in" aria-label="Zoom in">+</button>
+  <button id="home" aria-label="Whole slide">⌂</button>
   <button id="fullscreen" hidden>Fullscreen</button>
   <button id="open" hidden>Open in atlas</button>
 </header>
@@ -35,7 +39,7 @@
 </main>
 <footer id="disclaimer">Educational images, not for diagnosing individual patients.</footer>
 <script type="module">
-import { App } from "https://cdn.jsdelivr.net/npm/@modelcontextprotocol/ext-apps@2.0.0/dist/src/app-with-deps.js";
+import { App } from "%ORIGIN%/vendor/ext-apps-2.0.0-app-with-deps.js";
 
 const $ = (id) => document.getElementById(id);
 const TEXT = {
@@ -84,11 +88,11 @@ app.addEventListener("toolresult", ({ structuredContent: s, isError }) => {
   viewer?.destroy();
   viewer = OpenSeadragon({
     element: $("osd"),
-    prefixUrl: "https://cdn.jsdelivr.net/npm/openseadragon@6.1.1/build/openseadragon/images/",
     tileSources: s.tileSource,
     crossOriginPolicy: "Anonymous",
     drawer: "canvas",
     showNavigator: true,
+    showNavigationControl: false, // header buttons instead: OSD's own buttons need 40 image files
     showFullPageControl: false,
     cooperativeGestures: app.getHostContext()?.displayMode !== "fullscreen",
   });
@@ -105,6 +109,9 @@ $("fullscreen").onclick = async () => {
   const { mode } = await app.requestDisplayMode({ mode: next });
   applyContext({ ...app.getHostContext(), displayMode: mode });
 };
+$("zoom-in").onclick = () => viewer?.viewport.zoomBy(1.5).applyConstraints();
+$("zoom-out").onclick = () => viewer?.viewport.zoomBy(1 / 1.5).applyConstraints();
+$("home").onclick = () => viewer?.viewport.goHome();
 $("open").onclick = $("fail-open").onclick = () => app.openLink({ url: atlasUrl });
 
 await app.connect();

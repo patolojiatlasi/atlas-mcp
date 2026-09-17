@@ -2,11 +2,14 @@
   "name": "atlas-mcp",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "catalog": "node scripts/build-catalog.mjs",
     "test": "node --test",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --var PUBLIC_ORIGIN:http://localhost:8787",
+    "vendor": "node scripts/vendor.mjs",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
@@ -15,6 +18,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "openseadragon": "6.1.1",
     "wrangler": "4.133.0",
     "yaml": "2.9.1"
   }

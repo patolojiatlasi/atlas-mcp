@@ -72,3 +72,18 @@ test("findSlide accepts ids in any case and viewer URLs", () => {
   assert.equal(findSlide(index, bs18.atlas_url_tr)?.case, "BS18", "atlas section links resolve");
   assert.equal(findSlide(index, "nope/HE"), null);
 });
+
+test("viewer loads only self-hosted scripts whose SRI hashes match public/vendor", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { createHash } = await import("node:crypto");
+  const html = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf8");
+  const external = [...html.matchAll(/https?:\/\/[^"'\s)]+/g)].map((m) => m[0]);
+  assert.deepEqual(external, [], "no hard-coded external URLs (use %ORIGIN%)");
+  const pins = [...html.matchAll(/"?%ORIGIN%(\/vendor\/[^"]+)"?\s*(?:\n\s*)?integrity="(sha384-[^"]+)"|"%ORIGIN%(\/vendor\/[^"]+)":\s*"(sha384-[^"]+)"/g)]
+    .map((m) => [m[1] ?? m[3], m[2] ?? m[4]]);
+  assert.equal(pins.length, 2);
+  for (const [file, sri] of pins) {
+    const actual = "sha384-" + createHash("sha384").update(readFileSync(new URL(`../public${file}`, import.meta.url))).digest("base64");
+    assert.equal(actual, sri, file);
+  }
+});

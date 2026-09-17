@@ -4,5 +4,9 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-09-15",
   // Keep request logs out of storage: PRIVACY.md promises diagnostic lines are only seen live (wrangler tail).
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
+  // Viewer scripts (public/vendor), served before the Worker runs; CORS/caching in public/_headers.
+  "assets": { "directory": "./public" },
+  // Local dev: npx wrangler dev --var PUBLIC_ORIGIN:http://localhost:8787
+  "vars": { "PUBLIC_ORIGIN": "https://atlas-mcp.serdarbalci.workers.dev" }
 }

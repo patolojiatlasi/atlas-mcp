@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
@@ -6,10 +7,15 @@ import viewerHtml from "./viewer.html";
 import { buildIndex, searchSlides, findSlide } from "./search.js";
 
 // Bump the version whenever viewer.html changes: ChatGPT and Claude cache the resource by URI.
-const VIEWER_URI = "ui://atlas/viewer-v1.html";
+const VIEWER_URI = "ui://atlas/viewer-v2.html";
+// Public origin of this Worker: serves the viewer's scripts (public/vendor) and is the ChatGPT widget domain.
+const ORIGIN = env.PUBLIC_ORIGIN;
+const TILE_HOST = "https://images.patolojiatlasi.com";
+const ATLAS_SITES = ["https://www.patolojiatlasi.com", "https://www.histopathologyatlas.com"];
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
-const DISCLAIMER = "Educational reference images; not for diagnosing individual patients. Never include patient identifiers.";
+const DISCLAIMER = "Content is for medical education, not for diagnosing individual patients.";
 const index = buildIndex(catalog); // module scope: built once per isolate, not per request
+const viewer = viewerHtml.replaceAll("%ORIGIN%", ORIGIN);
 
 const text = (value) => [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value) }];
 
@@ -23,7 +29,7 @@ function createServer() {
       description:
         "Search the Patoloji Atlası / Histopathology Atlas (patolojiatlasi.com, histopathologyatlas.com) for whole-slide images " +
         "by diagnosis, organ, or stain (H&E, PAS, Giemsa, immunohistochemistry such as CD3 or GFAP). Query in English or Turkish. " +
-        "Returns cases with their slide ids and atlas links; call this before show_slide. " + DISCLAIMER,
+        "Returns matching cases with every stain's slide id (the input for show_slide) and links to the case pages. " + DISCLAIMER,
       inputSchema: z.object({
         query: z.string().min(1).describe("Diagnosis, organ and/or stain, e.g. 'signet ring cell carcinoma', 'lenfositik gastrit CD3'"),
       }),
@@ -39,7 +45,7 @@ function createServer() {
       title: "Show slide",
       description:
         "Open one whole-slide image from the atlas in an interactive zoomable viewer. " +
-        "The id must come from search_slides results (an atlas slide viewer URL or atlas section link also works). " + DISCLAIMER,
+        "Takes a slide id from search_slides results; an atlas slide viewer URL or atlas case link is also accepted. " + DISCLAIMER,
       inputSchema: z.object({ id: z.string().min(1).describe("Slide id from search_slides, e.g. 'lymphocytic-gastritis/CD3'") }),
       annotations: READ_ONLY,
       _meta: {
@@ -61,7 +67,7 @@ function createServer() {
       const { tileSource, terms, ...info } = slide; // terms may hold a quiz diagnosis: never return it
       const lines = [
         `${info.title_en} / ${info.title_tr}${info.stain ? ` (${info.stain})` : ""}`,
-        info.quiz && "Quiz case: the diagnosis is hidden. Do not guess or reveal it unless the user asks.",
+        info.quiz && "Self-assessment quiz case: the diagnosis is intentionally not included.",
         info.atlas_url_en && `Histopathology Atlas: ${info.atlas_url_en}`,
         info.atlas_url_tr && `Patoloji Atlası: ${info.atlas_url_tr}`,
         `Full-screen viewer: ${info.viewer_url}`,
@@ -75,12 +81,14 @@ function createServer() {
       {
         uri: VIEWER_URI,
         mimeType: RESOURCE_MIME_TYPE, // the helper sets it on the listing only; hosts read the contents item
-        text: viewerHtml,
+        text: viewer,
         _meta: {
-          ui: {
-            csp: { resourceDomains: ["https://cdn.jsdelivr.net", "https://images.patolojiatlasi.com"] },
-            prefersBorder: true,
-          },
+          // No ui.domain: Claude only accepts its own {hash}.claudemcpcontent.com value there.
+          ui: { csp: { resourceDomains: [ORIGIN, TILE_HOST] }, prefersBorder: true },
+          // ChatGPT-only aliases (ignored by other hosts): directory submission needs a widget domain,
+          // and redirect_domains lets "Open in atlas" links through.
+          "openai/widgetDomain": ORIGIN,
+          "openai/widgetCSP": { connect_domains: [], resource_domains: [ORIGIN, TILE_HOST], redirect_domains: [...ATLAS_SITES, TILE_HOST] },
         },
       },
     ],
@@ -109,7 +117,12 @@ async function logRequest(request) {
 
 export default {
   fetch: async (request) => {
-    if (new URL(request.url).pathname.replace(/\/+$/, "") !== "/mcp") {
+    const path = new URL(request.url).pathname.replace(/\/+$/, "");
+    // OpenAI plugin domain verification: the token comes from platform.openai.com (wrangler secret put OPENAI_APPS_CHALLENGE).
+    if (path === "/.well-known/openai-apps-challenge" && env.OPENAI_APPS_CHALLENGE) {
+      return new Response(env.OPENAI_APPS_CHALLENGE, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+    if (path !== "/mcp") {
       return new Response("Histopathology Atlas MCP server. Connect to /mcp", { status: 404 });
     }
     await logRequest(request);

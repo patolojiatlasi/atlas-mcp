@@ -52,7 +52,10 @@ Prompts:
 
 ## Publishing
 - [x] PRIVACY.md, TERMS.md, LICENSE (MIT code / CC BY 4.0 content), public README
-- [ ] Directory submissions (Claude, ChatGPT): per-host `ui.domain`, screenshots, test prompts
+- [x] Directory-ready server: `openai/widgetDomain` (no `ui.domain`), `openai/widgetCSP` redirect domains, OpenAI challenge route, self-hosted viewer scripts (no third-party CDN), descriptive tool texts, `viewer-v2`
+- [x] SUBMISSION.md (listing copy, 5+3 test cases, annotation justifications), icon 512×512
+- [ ] User: ChatGPT (identity verification, demo video, challenge token), Claude (Team/Enterprise org, carousel screenshots)
+- [ ] Re-test viewer-v2 in Claude and ChatGPT after deploy
 
 ## Later (with trigger)
 - Scheduled catalog refresh with a GitHub Action, once manual refresh feels stale. Use a non-cone sparse checkout of `/lists/list.yaml`, `/docs/*.html`, `/EN/*.html`, run daily at 03:00 UTC, and commit only the catalog.
