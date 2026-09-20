@@ -4,10 +4,10 @@ import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@model
 import { z } from "zod";
 import catalog from "../data/catalog.json" with { type: "json" };
 import viewerHtml from "./viewer.html";
-import { buildIndex, searchSlides, findSlide } from "./search.js";
+import { buildIndex, searchSlides, findSlide, visibleRegions, findRegion, publicSlide } from "./search.js";
 
 // Bump the version whenever viewer.html changes: ChatGPT and Claude cache the resource by URI.
-const VIEWER_URI = "ui://atlas/viewer-v2.html";
+const VIEWER_URI = "ui://atlas/viewer-v3.html";
 // Public origin of this Worker: serves the viewer's scripts (public/vendor) and is the ChatGPT widget domain.
 const ORIGIN = env.PUBLIC_ORIGIN;
 const TILE_HOST = "https://images.patolojiatlasi.com";
@@ -38,6 +38,41 @@ function createServer() {
     async ({ query }) => ({ content: text(searchSlides(index, query)) }),
   );
 
+  server.registerTool(
+    "list_regions",
+    {
+      title: "List named regions on a slide",
+      description:
+        "List the named teaching regions annotated on a whole-slide image: each has an id, a label (English/Turkish) and a " +
+        "location. Pass a region's id or label as show_slide's `region` parameter to open the viewer zoomed to it. " +
+        "Takes a slide id from search_slides results. " + DISCLAIMER,
+      inputSchema: z.object({ id: z.string().min(1).describe("Slide id from search_slides, e.g. 'lymphocytic-gastritis/HE'") }),
+      annotations: READ_ONLY,
+    },
+    async ({ id }) => {
+      const slide = findSlide(index, id);
+      if (!slide) {
+        return { isError: true, content: text({ error: `Unknown slide id "${id}". Use an id from search_slides.` }) };
+      }
+      if (slide.quiz) {
+        // Region labels are diagnoses on quiz slides (same reason `terms` is withheld); see visibleRegions().
+        return {
+          content: text({
+            id: slide.id,
+            quiz: true,
+            note: "Self-assessment quiz case: named regions are withheld so the diagnosis does not leak.",
+            regions: [],
+          }),
+        };
+      }
+      const regions = visibleRegions(slide);
+      if (!regions.length) {
+        return { content: text({ id: slide.id, regions: [], note: "This slide has no named regions yet." }) };
+      }
+      return { content: text({ id: slide.id, regions }) };
+    },
+  );
+
   registerAppTool(
     server,
     "show_slide",
@@ -45,8 +80,12 @@ function createServer() {
       title: "Show slide",
       description:
         "Open one whole-slide image from the atlas in an interactive zoomable viewer. " +
-        "Takes a slide id from search_slides results; an atlas slide viewer URL or atlas case link is also accepted. " + DISCLAIMER,
-      inputSchema: z.object({ id: z.string().min(1).describe("Slide id from search_slides, e.g. 'lymphocytic-gastritis/CD3'") }),
+        "Takes a slide id from search_slides results; an atlas slide viewer URL or atlas case link is also accepted. " +
+        "Pass `region` (an id or label from list_regions) to open the viewer zoomed to that named region. " + DISCLAIMER,
+      inputSchema: z.object({
+        id: z.string().min(1).describe("Slide id from search_slides, e.g. 'lymphocytic-gastritis/CD3'"),
+        region: z.string().optional().describe("A region id or label from list_regions, to open zoomed to that region"),
+      }),
       annotations: READ_ONLY,
       _meta: {
         ui: { resourceUri: VIEWER_URI },
@@ -54,7 +93,7 @@ function createServer() {
         "openai/toolInvocation/invoked": "Slide opened",
       },
     },
-    async ({ id }) => {
+    async ({ id, region }) => {
       const slide = findSlide(index, id);
       if (!slide) {
         const words = id.replace(/^https?:\/\/[^/]+\//i, "").replace(/\.html\b|#sec-|[/_-]/gi, " ");
@@ -64,15 +103,26 @@ function createServer() {
           content: text({ error: `Unknown slide id "${id}". Use an id from search_slides.`, suggestions: suggestions.no_match ? [] : suggestions.cases }),
         };
       }
-      const { tileSource, terms, ...info } = slide; // terms may hold a quiz diagnosis: never return it
+      // publicSlide() strips `terms` and quiz-filters `regions`: never spread the raw catalog record (see search.js).
+      const info = publicSlide(slide);
+      const { regions } = info;
+      const match = region ? findRegion(regions, region) : null;
       const lines = [
         `${info.title_en} / ${info.title_tr}${info.stain ? ` (${info.stain})` : ""}`,
         info.quiz && "Self-assessment quiz case: the diagnosis is intentionally not included.",
         info.atlas_url_en && `Histopathology Atlas: ${info.atlas_url_en}`,
         info.atlas_url_tr && `Patoloji Atlası: ${info.atlas_url_tr}`,
         `Full-screen viewer: ${info.viewer_url}`,
+        region && !match &&
+          `No region matching "${region}" was found${regions.length ? "; try one of: " + regions.map((r) => r.label_en || r.label_tr || r.id).join(", ") : " (this slide has no named regions)"}.`,
+        match && `Opened zoomed to: ${match.label_en || match.label_tr || match.id}.`,
+        !region && regions.length > 0 &&
+          `Named regions available: ${regions.map((r) => r.label_en || r.label_tr || r.id).join(", ")} (pass one as "region", or call list_regions).`,
       ];
-      return { content: text(lines.filter(Boolean).join("\n")), structuredContent: { ...info, tileSource } };
+      return {
+        content: text(lines.filter(Boolean).join("\n")),
+        structuredContent: { ...info, ...(match && { region: match }) },
+      };
     },
   );
 

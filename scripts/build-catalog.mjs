@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parse } from "yaml";
+import { mppFromVipsProperties } from "./mpp.mjs";
 
 const ATLAS_DIR = path.resolve(process.env.ATLAS_DIR ?? "../patolojiatlasi.github.io");
 const OUT = "data/catalog.json";
@@ -86,6 +87,38 @@ async function request(url, method) {
   }
 }
 
+// ---- optional per-slide extras: named regions + micrometres-per-pixel, both entirely normal to be absent
+// Compact region fields only: geometry (polygons) is dropped here, nothing downstream renders it and it would
+// bloat the bundle (worker.js imports data/catalog.json statically into every isolate).
+const REGION_FIELDS = ["id", "label_en", "label_tr", "x", "y", "width", "height"];
+const NOTE_MAX = 200; // matches the diagnosis-callout truncation above
+
+async function probeRegions(base) {
+  const res = await request(`${base}.regions.json`, "GET");
+  if (res.status === 404) return null;
+  const data = await res.json().catch(() => null);
+  if (!Array.isArray(data?.regions) || !data.regions.length) return null;
+  return data.regions.map((r) => {
+    const out = {};
+    for (const k of REGION_FIELDS) if (r[k] != null) out[k] = r[k];
+    for (const k of ["note_en", "note_tr"]) if (typeof r[k] === "string" && r[k].length && r[k].length <= NOTE_MAX) out[k] = r[k];
+    return out;
+  });
+}
+
+async function probeMpp(filesUrl) {
+  const res = await request(`${filesUrl}vips-properties.xml`, "GET");
+  if (res.status === 404) return null;
+  const { mpp, fromXres, recorded, disagrees } = mppFromVipsProperties(await res.text());
+  if (disagrees) {
+    console.warn(
+      `  ! ${filesUrl}vips-properties.xml disagrees about pixel size: ` +
+        `xres implies ${fromXres} um/px, scanner tag says ${recorded} um/px; using ${fromXres}`,
+    );
+  }
+  return mpp; // both absent -> null -> omit the field, do not guess
+}
+
 async function probe(viewerUrl) {
   const base = viewerUrl.replace(/\.html$/, "");
   for (const dzi of [`${base}.dzi`, `${path.posix.dirname(base)}/z_0.dzi`]) {
@@ -96,18 +129,18 @@ async function probe(viewerUrl) {
     const filesUrl = `${dzi.replace(/\.dzi$/, "")}_files/`;
     for (const format of [...new Set([attr("Format"), "jpeg", "jpg"])].filter(Boolean)) {
       if ((await request(`${filesUrl}8/0_0.${format}`, "HEAD")).status === 404) continue;
-      return {
-        tileSource: {
-          Image: {
-            xmlns: attr("xmlns"),
-            Url: filesUrl,
-            Format: format,
-            Overlap: Number(attr("Overlap")),
-            TileSize: Number(attr("TileSize")),
-            Size: { Width: Math.round(Number(attr("Width"))), Height: Math.round(Number(attr("Height"))) },
-          },
+      const tileSource = {
+        Image: {
+          xmlns: attr("xmlns"),
+          Url: filesUrl,
+          Format: format,
+          Overlap: Number(attr("Overlap")),
+          TileSize: Number(attr("TileSize")),
+          Size: { Width: Math.round(Number(attr("Width"))), Height: Math.round(Number(attr("Height"))) },
         },
       };
+      const [regions, mpp] = await Promise.all([probeRegions(base), probeMpp(filesUrl)]);
+      return { tileSource, ...(regions && { regions }), ...(mpp != null && { mpp }) };
     }
     return { dropped: "dzi has no tiles" };
   }

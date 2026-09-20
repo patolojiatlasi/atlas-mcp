@@ -86,3 +86,36 @@ export function findSlide(index, idOrUrl) {
     .toLowerCase();
   return index.byId.get(key) ?? null;
 }
+
+// Named teaching regions a slide carries (build-catalog.mjs strips geometry; see data/catalog.json's `regions`).
+// Quiz slides' region labels are diagnoses (written in QuPath) same as the `terms` field, so they never leave this
+// function for a quiz slide: both show_slide and list_regions call this instead of reading `slide.regions` directly.
+export function visibleRegions(slide) {
+  return slide?.quiz ? [] : (slide?.regions ?? []);
+}
+
+// Same Turkish-safe case fold tokens() uses (İ/ı fold to plain i via NFD + combining-mark strip), but keeps the
+// string intact instead of splitting into words: findRegion compares whole labels, not word sets.
+const foldCase = (s) => String(s ?? "").toLowerCase().replace(/ı/g, "i").normalize("NFD").replace(/\p{M}/gu, "");
+
+// Resolve a region reference (id or label, either language) against an already quiz-filtered region list.
+// Id match first (exact, then case-insensitive), then case-insensitive label match in either language.
+export function findRegion(regions, ref) {
+  const needle = String(ref ?? "").trim();
+  if (!needle || !regions?.length) return null;
+  const folded = foldCase(needle);
+  return (
+    regions.find((r) => r.id === needle) ??
+    regions.find((r) => foldCase(r.id) === folded) ??
+    regions.find((r) => [r.label_en, r.label_tr].some((l) => l && foldCase(l) === folded)) ??
+    null
+  );
+}
+
+// Everything show_slide is allowed to hand back for one slide: strips `terms` (search-only, may hold a quiz
+// diagnosis) and applies visibleRegions()'s quiz rule to `regions`, so the raw catalog record is never spread
+// into structuredContent un-filtered. list_regions uses visibleRegions() directly; show_slide uses this.
+export function publicSlide(slide) {
+  const { tileSource, terms, regions, ...info } = slide;
+  return { ...info, tileSource, regions: visibleRegions(slide) };
+}
