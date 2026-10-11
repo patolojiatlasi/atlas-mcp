@@ -2855,19 +2855,7 @@
       "Height": 46867
      }
     }
-   },
-   "regions": [
-    {
-     "id": "r1",
-     "label_en": "Nodular fasciitis focus",
-     "label_tr": "Nodüler fasciitis odağı",
-     "x": 20000,
-     "y": 18000,
-     "width": 5000,
-     "height": 4000,
-     "note_en": "The region labels on this quiz slide encode the diagnosis; they exist only to test that visibleRegions() withholds them."
-    }
-   ]
+   }
   },
   {
    "id": "hacettepe-com-case-10/HE",
@@ -4189,28 +4177,6 @@
      }
     }
    },
-   "regions": [
-    {
-     "id": "r1",
-     "label_en": "Lymphoid aggregate",
-     "label_tr": "Lenfoid agregat",
-     "x": 12000,
-     "y": 8000,
-     "width": 3000,
-     "height": 2400,
-     "note_en": "Dense lymphoid aggregate in the lamina propria.",
-     "note_tr": "Lamina propriada yoğun lenfoid agregat."
-    },
-    {
-     "id": "r2",
-     "label_en": "Intraepithelial lymphocytosis",
-     "label_tr": "İntraepitelyal lenfositoz",
-     "x": 30000,
-     "y": 15000,
-     "width": 4000,
-     "height": 3000
-    }
-   ],
    "mpp": 0.263018
   },
   {

@@ -3,6 +3,41 @@ import assert from "node:assert/strict";
 import catalog from "../data/catalog.json" with { type: "json" };
 import { buildIndex, searchSlides, findSlide, tokens, visibleRegions, findRegion, publicSlide } from "../src/search.js";
 
+// Region fixtures are declared here rather than read out of data/catalog.json. The catalog is
+// published data: it must not carry invented coordinates, and a quiz-leak regression test must not
+// depend on a real diagnosis being present in it. These shapes mirror what build-catalog.mjs
+// attaches (the REGION_FIELDS whitelist), so they still exercise the real projection path.
+const REGION_SLIDE = {
+  id: "lymphocytic-gastritis/HE",
+  case: "lymphocytic-gastritis",
+  stain: "H&E",
+  title_en: "Lymphocytic gastritis",
+  title_tr: "Lenfositik gastrit",
+  mpp: 0.263018,
+  terms: "Lenfositik gastrit | Lymphocytic gastritis",
+  tileSource: { Image: { Format: "jpeg", Overlap: 1, TileSize: 254, Size: { Width: 79923, Height: 42180 } } },
+  regions: [
+    { id: "r1", label_en: "Lymphoid aggregate", label_tr: "Lenfoid agregat",
+      x: 12000, y: 8000, width: 3000, height: 2400 },
+    { id: "r2", label_en: "Intraepithelial lymphocytosis", label_tr: "İntraepitelyal lenfositoz",
+      x: 30000, y: 16000, width: 2000, height: 1600 },
+  ],
+};
+
+// A quiz slide whose region label *is* the answer -- the exact leak this must prevent.
+const QUIZ_SLIDE = {
+  id: "quiz-case/HE",
+  case: "quiz-case",
+  stain: "H&E",
+  quiz: true,
+  terms: "Nodular fasciitis",
+  tileSource: { Image: { Format: "jpeg", Overlap: 1, TileSize: 254, Size: { Width: 40000, Height: 30000 } } },
+  regions: [
+    { id: "r1", label_en: "Nodular fasciitis focus", label_tr: "Nodüler fasciitis odağı",
+      x: 20000, y: 18000, width: 5000, height: 4000 },
+  ],
+};
+
 const index = buildIndex(catalog);
 const caseNames = (query) => searchSlides(index, query).cases.map((c) => c.case);
 
@@ -59,7 +94,7 @@ test("quiz cases are findable by diagnosis without revealing it", () => {
 });
 
 test("named regions: quiz slides never expose region labels via list_regions' visibleRegions()", () => {
-  const quiz = catalog.slides.find((s) => s.id === "hacettepe-com-case-1/HE");
+  const quiz = QUIZ_SLIDE;
   assert.equal(quiz.quiz, true, "fixture is still a quiz slide");
   assert.ok(quiz.regions?.length, "fixture still carries a region whose label would leak the diagnosis");
   const visible = visibleRegions(quiz);
@@ -73,7 +108,7 @@ test("named regions: quiz slides never expose region labels via list_regions' vi
 test("named regions: quiz slides never expose region labels via show_slide's publicSlide() projection", () => {
   // This is the exact object show_slide spreads into structuredContent (worker.js: `{ ...publicSlide(slide) }`),
   // so this is the real leak path the task asked to regression-test, not just the visibleRegions() primitive.
-  const quiz = catalog.slides.find((s) => s.id === "hacettepe-com-case-1/HE");
+  const quiz = QUIZ_SLIDE;
   const projected = publicSlide(quiz);
   assert.deepEqual(projected.regions, []);
   assert.ok(!("terms" in projected), "search-only terms field is also stripped");
@@ -81,7 +116,7 @@ test("named regions: quiz slides never expose region labels via show_slide's pub
 });
 
 test("named regions: a normal slide's regions pass through untouched", () => {
-  const slide = catalog.slides.find((s) => s.id === "lymphocytic-gastritis/HE");
+  const slide = REGION_SLIDE;
   const regions = visibleRegions(slide);
   assert.equal(regions.length, 2);
   assert.equal(regions[0].id, "r1");
@@ -91,7 +126,7 @@ test("named regions: a normal slide's regions pass through untouched", () => {
 });
 
 test("named regions: findRegion resolves by id and by case-insensitive label in either language", () => {
-  const regions = visibleRegions(catalog.slides.find((s) => s.id === "lymphocytic-gastritis/HE"));
+  const regions = visibleRegions(REGION_SLIDE);
   assert.equal(findRegion(regions, "r1")?.label_en, "Lymphoid aggregate");
   assert.equal(findRegion(regions, "R2")?.label_en, "Intraepithelial lymphocytosis", "id match is case-insensitive on fallback");
   assert.equal(findRegion(regions, "lymphoid aggregate")?.id, "r1", "English label, case-insensitive");
@@ -104,13 +139,13 @@ test("named regions: findRegion resolves by id and by case-insensitive label in 
 test("named regions: findRegion folds Turkish letters (İ/ı), same as tokens()", () => {
   // r2's label_tr is "İntraepitelyal lenfositoz" (capital dotted İ). Plain .toLowerCase() turns İ into
   // "i" + a combining dot above, which would never equal a plain-ASCII "i" a model types.
-  const regions = visibleRegions(catalog.slides.find((s) => s.id === "lymphocytic-gastritis/HE"));
+  const regions = visibleRegions(REGION_SLIDE);
   assert.equal(findRegion(regions, "intraepitelyal lenfositoz")?.id, "r2");
   assert.equal(findRegion(regions, "İNTRAEPİTELYAL LENFOSİTOZ")?.id, "r2", "uppercase Turkish dotted-I form too");
 });
 
 test("named regions: publicSlide() attaches quiz-safe regions and drops terms, for a normal slide too", () => {
-  const slide = catalog.slides.find((s) => s.id === "lymphocytic-gastritis/HE");
+  const slide = REGION_SLIDE;
   const projected = publicSlide(slide);
   assert.ok(!("terms" in projected));
   assert.equal(projected.regions.length, 2);
