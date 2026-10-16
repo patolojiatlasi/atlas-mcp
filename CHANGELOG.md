@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-16 — Align region availability and tool inventory
+
+- Withhold `list_regions` and `show_slide.region` while all 229 published region sidecars
+  return 404 and the bundled catalog has no regions. Keep `search_slides` and `show_slide` read-only.
+- Synchronize README and directory materials; document source validation, restoration and
+  deployment steps. Preserve quiz filtering and keep synthetic annotations in tests only.
+- Test actual Worker registration/callbacks, documentation inventories, absent regions and
+  synthetic authored/quiz regions. Catalog and viewer resource are unchanged.
+
 ## Lessons (V1 build, 2026-09-17)
 
 | Failure mode | Detection signal | Prevention rule |
