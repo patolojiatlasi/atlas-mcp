@@ -2,6 +2,11 @@
 
 Copy-ready values for listing the connector in the **ChatGPT plugin directory** and the **Claude connectors directory**. Requirements were checked against the vendors' docs on 2026-09-17; re-check the portals before submitting.
 
+**Current inventory:** exactly two read-only tools, `search_slides` and `show_slide`.
+`list_regions` and the `show_slide.region` input are withheld until genuine published teaching
+regions have been validated (see README.md). Do not advertise named-region navigation in
+listing copy, screenshots or demonstrations. No submission date or approval status is established here.
+
 ## Before you start
 
 | | ChatGPT (platform.openai.com/plugins) | Claude (claude.ai/admin-settings/directory/submissions/new) |
@@ -121,6 +126,15 @@ Extra for Claude (≥3 required):
   - `https://images.patolojiatlasi.com`
 - **Carousel screenshots:** 3–5 PNGs, at least **1000 px wide**, cropped to the viewer only (no prompt visible), each paired with the prompt that produced it. Suggested prompts: starter prompts 1, 2 and 4 above, plus a fullscreen view.
 - **Compliance:** 7 policy acknowledgments in the portal. Escalations: mcp-review@anthropic.com.
+
+## Deploying this inventory correction
+
+- Deploy the corrected Worker, then confirm `tools/list` exposes only `search_slides` and
+  `show_slide`, with no `region` input. Refresh the connector in ChatGPT and Claude because
+  tool metadata is cached. The viewer resource is unchanged; no viewer URI bump is needed.
+- If a submission or listing already exists, synchronize its tools and demonstrations with
+  the deployed inventory and follow any portal review/resubmission requirement. Check the
+  actual portal status; this repository does not establish approval or a submission deadline.
 
 ## After publishing
 
