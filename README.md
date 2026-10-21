@@ -44,6 +44,8 @@ Yalnızca eğitim amaçlıdır; hasta tanısı için kullanmayın ve hasta kimli
 | `search_slides` | Finds cases by diagnosis, organ or stain. Returns every stain for a case plus links to the English and Turkish atlas pages. |
 | `show_slide` | Opens a slide in a zoomable OpenSeadragon viewer inside the chat, with fullscreen and "Open in atlas" buttons. The text reply also contains the links, so it stays useful in apps that can't show the viewer. |
 
+`list_regions` and the `show_slide.region` input are withheld: the bundled catalog has no verified teaching regions. Whole-slide viewing remains available.
+
 Both tools are read-only. The viewer is built on the open [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) standard, so one server works in ChatGPT and Claude.
 
 ## Support
@@ -100,3 +102,30 @@ npx wrangler tail      # live request log: request type and tool name only
 - **Quiz cases:** diagnoses sit in the search-only `terms` field. `show_slide` and search results never return that field.
 
 Directory listing: [SUBMISSION.md](SUBMISSION.md). Build notes and lessons learned: [TODO.md](TODO.md), [CHANGELOG.md](CHANGELOG.md).
+
+### Restoring teaching-region navigation
+
+The 2026-10-16 audit found 229 slides / 160 cases, no bundled regions, and HTTP 404 at all
+229 published `<slide>.regions.json` URLs. The builder probes those sidecars beside each viewer;
+it does not read local QuPath projects. QuPath's export capability and example coordinates in
+its documentation are not evidence of annotations on a published slide. The authoritative export
+contract and publication workflow are documented in
+[QuPath teaching regions](https://github.com/sbalci/patolojiatlasi-QuPath/blob/e4e76a6633f5d6d17ad6ac0d8dc4f94b3c8152ff/docs/teaching-regions.md).
+No catalog data or example coordinates were added by this correction.
+
+Before restoring `list_regions` and `show_slide.region`:
+
+1. Have an atlas curator draw and verify regions on each actual slide in QuPath, then publish
+   its `atlas-regions/1` sidecar beside that slide's DZI. Do not copy examples or reuse another stain's coordinates.
+2. Validate the source slide identity, full-resolution dimensions against the DZI, unique IDs,
+   meaningful bilingual labels, finite positive bounding boxes within the image, and source provenance.
+   The current builder only whitelists compact fields; it does **not** enforce these checks yet.
+3. Rebuild the catalog from the published sources and cross-check the locations in QuPath and the viewer.
+   Keep geometry and arbitrary metadata out of tool output. Quiz labels, notes and search-only
+   diagnoses must remain withheld through `visibleRegions()` and `publicSlide()`.
+4. Restore and test tool registration, region lookup and no-region responses; update both this
+   tool table and SUBMISSION.md's inventory and annotation justifications in the same change.
+5. Deploy, refresh cached connector metadata, verify `tools/list` and quiz outputs in both hosts,
+   and update any existing directory submission as required by its portal.
+
+Until then, region handling remains internal and its regression fixtures stay synthetic and test-only.
